@@ -6,4 +6,5 @@ import (
 
 func main() {
 	multi_source_game_scraper.ScrapeMetacritic()
+
 }

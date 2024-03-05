@@ -7,50 +7,78 @@ import (
 )
 
 type GameData struct {
-	url, image, name, releaseDate string
-	price, userScore              float32
-	metascore                     int
-	tags                          []string
+	url, image, title, releaseDate string
+	price, userScore               float32
+	metascore                      int
+	tags                           []string
 }
 
 func ScrapeMetacritic() []GameData {
 
 	var metacriticGames []GameData
 
-	collector := colly.NewCollector()
-
-	err := collector.Visit("https://scrapeme.live/shop/")
-	if err != nil {
-		log.Println("Error when visiting site; pointer set to ", err)
-		return metacriticGames
-	}
-
-	log.Println("Collector visited website successfully!")
+	collector := colly.NewCollector(
+		colly.MaxDepth(1),
+	)
 
 	collector.OnRequest(func(request *colly.Request) {
-		fmt.Println("Visiting: ", request.URL)
+		fmt.Println("Visiting:", request.URL)
 	})
 
 	collector.OnResponse(func(response *colly.Response) {
-		fmt.Println("Page visited: ", response.Request.URL)
+		fmt.Println("Page visited:", response.Request.URL)
 	})
 
 	collector.OnError(func(response *colly.Response, err error) {
-		log.Println("Something went wrong: ", err)
+		log.Println("Something went wrong:", err)
 	})
 
 	collector.OnScraped(func(request *colly.Response) {
-		fmt.Println(request.Request.URL, " scraped!")
+		fmt.Println(request.Request.URL, "scraped!")
 	})
 
-	collector.OnHTML("li.product", func(element *colly.HTMLElement) {
-		game := GameData{}
-		//game.url = element.Attr("href")
-		game.url = element.ChildAttr("a", "href")
-		fmt.Println(game.url)
-
-		metacriticGames = append(metacriticGames, game)
+	// Goes into link of each element on page and scrapes the game data from their specific site
+	collector.OnHTML("a.c-finderProductCard_container", func(element *colly.HTMLElement) {
+		metacriticGames = append(metacriticGames, ScrapeSingleMetacriticGame("https://www.metacritic.com"+element.Attr("href")))
 	})
 
+	err := collector.Visit("https://www.metacritic.com/browse/game/")
+	if err != nil {
+		log.Println("Error when visiting site; pointer set to", err)
+		return metacriticGames
+	}
 	return metacriticGames
+}
+
+func ScrapeSingleMetacriticGame(link string) GameData {
+
+	var gameData GameData
+	gameData.url = link
+	log.Println(gameData.url)
+
+	collector := colly.NewCollector()
+
+	collector.OnRequest(func(request *colly.Request) {
+		fmt.Println("Visiting:", request.URL)
+	})
+
+	collector.OnResponse(func(response *colly.Response) {
+		fmt.Println("Page visited:", response.Request.URL)
+	})
+
+	collector.OnError(func(response *colly.Response, err error) {
+		log.Println("Something went wrong:", err)
+	})
+
+	collector.OnScraped(func(request *colly.Response) {
+		fmt.Println(request.Request.URL, "scraped!")
+	})
+
+	collector.OnHTML("div.c-productHero_title", func(element *colly.HTMLElement) {
+		gameData.title = element.ChildText("div")
+		log.Println(gameData.title)
+
+	})
+
+	return gameData
 }
