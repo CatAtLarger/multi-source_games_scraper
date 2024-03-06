@@ -15,7 +15,7 @@ type GameData struct {
 	tags, platforms                                                           []string
 }
 
-func ScrapeMetacriticPage(link string) []GameData {
+func ScrapeMetacriticPage(currentLink string) []GameData {
 
 	var metacriticGames []GameData
 
@@ -39,29 +39,26 @@ func ScrapeMetacriticPage(link string) []GameData {
 		fmt.Println(request.Request.URL, "scraped!")
 	})
 
-	// Goes into link of each element on page and scrapes the game data from their specific site
+	// Goes into currentLink of each element on page and scrapes the game data from their specific site
 	collector.OnHTML("a.c-finderProductCard_container", func(element *colly.HTMLElement) {
 		game := ScrapeSingleMetacriticGame("https://www.metacritic.com" + element.Attr("href"))
 		metacriticGames = append(metacriticGames, game)
 	})
 
-	//if HasNextPage(collector) {
-	//	metacriticGames = extend(metacriticGames, ScrapeMetacriticPage(ReturnMetacriticNextPage(link, collector)))
-	//}
-
-	err := collector.Visit("https://www.metacritic.com/browse/game/")
+	err := collector.Visit(currentLink)
 	if err != nil {
 		log.Println("Error when visiting site; pointer set to", err)
 		return metacriticGames
 	}
+	ScrapeMetacriticPage(NextPageLink(currentLink, 548))
 	return metacriticGames
 }
 
 // Only returns User Score, Review Score, Title, Publisher, and Release Date
-func ScrapeSingleMetacriticGame(link string) GameData {
+func ScrapeSingleMetacriticGame(currentLink string) GameData {
 
 	var gameData GameData
-	gameData.url = link
+	gameData.url = currentLink
 
 	collector := colly.NewCollector(
 		colly.Async(true),
@@ -142,7 +139,7 @@ func ScrapeSingleMetacriticGame(link string) GameData {
 		}
 	})
 
-	err := collector.Visit(link)
+	err := collector.Visit(currentLink)
 	if err != nil {
 		log.Println("Error when visiting site; pointer set to", err)
 		return gameData
@@ -151,38 +148,24 @@ func ScrapeSingleMetacriticGame(link string) GameData {
 	return gameData
 }
 
-// ReturnMetacriticNextPage returns blank if page not found
-func ReturnMetacriticNextPage(link string, collector *colly.Collector) string {
+func NextPageLink(currentLink string, maxPageNumber int) string {
 
-	if HasNextPage(collector) {
-		if strings.HasSuffix(link, "page=%d") {
-			tempSubSplice := strings.SplitN(link, "page=", 2)
-			link = tempSubSplice[0]
+	if strings.HasSuffix(currentLink, "page=%d") {
+		tempSubSplice := strings.SplitN(currentLink, "page=", 2)
+		currentLink = tempSubSplice[0]
 
-			pageNumber, err := strconv.Atoi(tempSubSplice[1])
-
-			if err != nil {
-				log.Println("Cannot convert string to integer:", err)
-			}
-			link = link + "page=" + strconv.Itoa(pageNumber+1)
-		} else {
-			//if not has page suffix and has no next page then must be first page
-			link = link + "?page=2"
+		pageNumber, err := strconv.Atoi(tempSubSplice[1])
+		if err != nil {
+			log.Println("Cannot convert string to integer:", err)
 		}
+
+		if pageNumber < maxPageNumber {
+			currentLink = currentLink + "page=" + strconv.Itoa(pageNumber+1)
+		}
+	} else {
+		//if not has page suffix then must be first page
+		currentLink = currentLink + "?page=2"
 	}
+	return currentLink
 
-	return ""
-
-}
-
-func HasNextPage(collector *colly.Collector) bool {
-
-	var nextPageExists = false
-
-	collector.OnHTML("c-navigationPagination_item", func(element *colly.HTMLElement) {
-		if !(element.Attr("c-navigationPagination_item--next") == "disabled") {
-			nextPageExists = true
-		}
-	})
-	return nextPageExists
 }

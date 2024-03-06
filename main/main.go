@@ -6,5 +6,4 @@ import (
 
 func main() {
 	multi_source_game_scraper.ScrapeMetacriticPage("https://www.metacritic.com/browse/game/")
-
 }
