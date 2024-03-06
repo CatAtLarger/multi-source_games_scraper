@@ -45,12 +45,34 @@ func ScrapeMetacriticPage(currentLink string) []GameData {
 		metacriticGames = append(metacriticGames, game)
 	})
 
+	//Goes to next page
+	collector.OnHTML("span.c-navigationPagination_itemButtonContent", func(element *colly.HTMLElement) {
+
+		//#arrowChevron means there is a next page
+		//if not next page then this element should be #arrowChevronDisabled
+		if element.ChildAttr("use", "href") == "#arrowChevron" {
+			log.Println(element.ChildAttr("use", "href"))
+			tempSubSplice := strings.SplitN(currentLink, "page=", 2)
+
+			currentPageNumber, err := strconv.Atoi(tempSubSplice[1])
+
+			if err != nil {
+				log.Println("Error when visiting site; pointer set to", err)
+			}
+
+			nextPageNumber := currentPageNumber + 1
+
+			ScrapeMetacriticPage(tempSubSplice[0] + "page=" + strconv.Itoa(nextPageNumber))
+
+		}
+
+	})
+
 	err := collector.Visit(currentLink)
 	if err != nil {
 		log.Println("Error when visiting site; pointer set to", err)
 		return metacriticGames
 	}
-	ScrapeMetacriticPage(NextPageLink(currentLink, 548))
 	return metacriticGames
 }
 
@@ -117,10 +139,16 @@ func ScrapeSingleMetacriticGame(currentLink string) GameData {
 	//Rating and Developer
 	collector.OnHTML("div.c-heroMetadata", func(element *colly.HTMLElement) {
 
+		//if gameData.rating is empty then get game rating
 		if len(gameData.rating) < 1 {
 			devAndRating := strings.Split(element.ChildText("span"), "\n")
 			gameData.rating = devAndRating[0]
-			gameData.publisher = strings.TrimSpace(devAndRating[2])
+
+			// if devAndRating is greater than 2 then there is a publisher record assigned to devAndRating[2]
+			if len(devAndRating) > 2 {
+				gameData.publisher = strings.TrimSpace(devAndRating[2])
+			}
+
 			log.Println(gameData.rating)
 			log.Println(gameData.publisher)
 		}
@@ -146,26 +174,4 @@ func ScrapeSingleMetacriticGame(currentLink string) GameData {
 	}
 
 	return gameData
-}
-
-func NextPageLink(currentLink string, maxPageNumber int) string {
-
-	if strings.HasSuffix(currentLink, "page=%d") {
-		tempSubSplice := strings.SplitN(currentLink, "page=", 2)
-		currentLink = tempSubSplice[0]
-
-		pageNumber, err := strconv.Atoi(tempSubSplice[1])
-		if err != nil {
-			log.Println("Cannot convert string to integer:", err)
-		}
-
-		if pageNumber < maxPageNumber {
-			currentLink = currentLink + "page=" + strconv.Itoa(pageNumber+1)
-		}
-	} else {
-		//if not has page suffix then must be first page
-		currentLink = currentLink + "?page=2"
-	}
-	return currentLink
-
 }
